@@ -1,0 +1,233 @@
+package views
+
+import (
+	"encoding/json"
+	"strconv"
+	"strings"
+)
+
+// PageData carries everything the editor needs at render time. It is built per
+// request so an uploaded background is never baked into the page definition.
+type PageData struct {
+	HasBackground    bool
+	BackgroundURL    string
+	BackgroundWidth  int
+	BackgroundHeight int
+	HasPublish       bool
+	PublishLabel     string
+	RememberValues   bool
+	PersistenceKey   string
+	Fonts            []FontData
+	Elements         []ElementData
+	URLs             PageURLs
+}
+
+type PageURLs struct {
+	Upload  string
+	Export  string
+	Publish string
+}
+
+type FontData struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+type ElementData struct {
+	Field    string
+	Label    string
+	X        int
+	Y        int
+	FontSize float64
+	Color    string
+	Align    string
+	Font     string
+	MaxWidth int
+}
+
+type styleDefault struct {
+	Font  string `json:"font"`
+	Color string `json:"color"`
+}
+
+type editorConfig struct {
+	StorageKey    string                  `json:"storageKey"`
+	Remember      bool                    `json:"remember"`
+	Fields        []string                `json:"fields"`
+	FieldDefaults map[string]string       `json:"fieldDefaults"`
+	StyleDefaults map[string]styleDefault `json:"styleDefaults"`
+	Fonts         []FontData              `json:"fonts"`
+}
+
+templ Editor(d *PageData) {
+	<div class="imagetpl" x-data="imagetpl" data-config={ editorConfigJSON(d) }>
+		<div class="imagetpl-layout">
+			@Preview(d)
+			<form class="imagetpl-fields" method="post" action={ d.URLs.Export } x-on:submit="persist()">
+				<div class="imagetpl-fields-heading">
+					<div>
+						<strong>Image details</strong>
+						<span>Enter the copy and tune each layer before exporting.</span>
+					</div>
+					if d.RememberValues {
+						<span class="imagetpl-save-state" aria-live="polite" x-text="saveMessage"></span>
+					}
+				</div>
+				for _, el := range d.Elements {
+					<div class="imagetpl-field">
+						@fieldInput(el)
+						<div class="imagetpl-style-grid">
+							@fontInput(el, d.Fonts)
+							<label class="imagetpl-colour-field">
+								<span>Colour</span>
+								<div class="imagetpl-colour-control">
+									<input
+										type="color"
+										name={ colorFieldName(el.Field) }
+										value={ el.Color }
+										x-model={ stylePropertyExpr(el.Field, "color") }
+										aria-label={ el.Label + " colour" }
+									/>
+									<output x-text={ stylePropertyExpr(el.Field, "color") }></output>
+								</div>
+							</label>
+						</div>
+					</div>
+				}
+				if len(d.Elements) > 0 {
+					<div class="imagetpl-actions">
+						<button type="submit" class="ir-btn-primary">Download JPEG</button>
+						if d.HasPublish {
+							<button
+								type="button"
+								class="ir-btn-outline"
+								hx-post={ d.URLs.Publish }
+								hx-swap="none"
+							>{ d.PublishLabel }</button>
+						}
+					</div>
+					if d.RememberValues {
+						<button type="button" class="imagetpl-clear" x-on:click="clearSaved()">Clear saved values</button>
+					}
+				}
+			</form>
+		</div>
+		<form class="imagetpl-upload" method="post" enctype="multipart/form-data" action={ d.URLs.Upload }>
+			<div class="imagetpl-upload-copy">
+				<strong>Background image</strong>
+				<span>Use a JPG, PNG, or GIF up to 32 MB.</span>
+			</div>
+			<label class="imagetpl-upload-picker">
+				<span>Choose image</span>
+				<input type="file" name="background" accept="image/jpeg,image/png,image/gif" data-imagetpl-upload-input/>
+			</label>
+			<button type="submit" class="ir-btn-outline">Upload background</button>
+		</form>
+	</div>
+}
+
+templ Preview(d *PageData) {
+	<div class="ir-card imagetpl-preview">
+		<div class="imagetpl-preview-header">
+			<strong>Preview</strong>
+			if d.HasBackground {
+				<span>{ strconv.Itoa(d.BackgroundWidth) + " × " + strconv.Itoa(d.BackgroundHeight) }</span>
+			}
+		</div>
+		<div class="imagetpl-preview-body">
+			if d.HasBackground {
+				<div class="imagetpl-frame">
+					<img class="imagetpl-bg" src={ d.BackgroundURL } alt="Template background"/>
+					for _, el := range d.Elements {
+						<div
+							class={ "imagetpl-el " + el.Align }
+							style={ elStyle(el, d.BackgroundWidth, d.BackgroundHeight) }
+						x-text={ fieldExpr(el.Field) }
+						x-bind:style={ previewStyleExpr(el.Field) }
+						></div>
+					}
+				</div>
+			} else {
+				<div class="imagetpl-empty">
+					<strong>Upload a background to begin</strong>
+					<span>Your text and styling choices will appear here.</span>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+func editorConfigJSON(d *PageData) string {
+	config := editorConfig{
+		StorageKey:    d.PersistenceKey,
+		Remember:      d.RememberValues,
+		Fields:        make([]string, 0, len(d.Elements)),
+		FieldDefaults: make(map[string]string, len(d.Elements)),
+		StyleDefaults: make(map[string]styleDefault, len(d.Elements)),
+		Fonts:         append([]FontData(nil), d.Fonts...),
+	}
+	for _, el := range d.Elements {
+		config.Fields = append(config.Fields, el.Field)
+		config.FieldDefaults[el.Field] = ""
+		config.StyleDefaults[el.Field] = styleDefault{Font: el.Font, Color: el.Color}
+	}
+	encoded, _ := json.Marshal(config)
+	return string(encoded)
+}
+
+func fieldExpr(field string) string {
+	return "fields[" + strconv.Quote(field) + "]"
+}
+
+func stylePropertyExpr(field, property string) string {
+	return "styles[" + strconv.Quote(field) + "][" + strconv.Quote(property) + "]"
+}
+
+func previewStyleExpr(field string) string {
+	return "styleFor(" + strconv.Quote(field) + ")"
+}
+
+func fontFieldName(field string) string {
+	return "_imagetpl_font_" + field
+}
+
+func colorFieldName(field string) string {
+	return "_imagetpl_color_" + field
+}
+
+func elStyle(el ElementData, bgW, bgH int) string {
+	var b strings.Builder
+	if bgW > 0 {
+		b.WriteString("left:" + pct(el.X, bgW) + "%;")
+		b.WriteString("font-size:" + cqw(el.FontSize, bgW) + "cqw;")
+		if el.MaxWidth > 0 {
+			b.WriteString("width:" + pct(el.MaxWidth, bgW) + "%;")
+		}
+	} else {
+		b.WriteString("left:" + strconv.Itoa(el.X) + "px;")
+		b.WriteString("font-size:" + strconv.FormatFloat(el.FontSize, 'f', -1, 64) + "px;")
+		if el.MaxWidth > 0 {
+			b.WriteString("width:" + strconv.Itoa(el.MaxWidth) + "px;")
+		}
+	}
+	if bgH > 0 {
+		b.WriteString("top:" + pct(el.Y, bgH) + "%;")
+	} else {
+		b.WriteString("top:" + strconv.Itoa(el.Y) + "px;")
+	}
+	switch el.Align {
+	case "center":
+		b.WriteString("transform:translateX(-50%);")
+	case "right":
+		b.WriteString("transform:translateX(-100%);")
+	}
+	return b.String()
+}
+
+func pct(px, total int) string {
+	return strconv.FormatFloat(float64(px)/float64(total)*100, 'f', -1, 64)
+}
+
+func cqw(px float64, bgW int) string {
+	return strconv.FormatFloat(px/float64(bgW)*100, 'f', -1, 64)
+}

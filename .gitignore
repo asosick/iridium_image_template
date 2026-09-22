@@ -1,0 +1,5 @@
+# Publish-hook output (test app writes rendered JPEGs here)
+exports/
+
+# Local binaries
+imagetpl-test
