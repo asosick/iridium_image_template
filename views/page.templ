@@ -16,6 +16,7 @@ type PageData struct {
 	HasPublish       bool
 	PublishLabel     string
 	RememberValues   bool
+	FieldDefaults    map[string]string
 	PersistenceKey   string
 	Fonts            []FontData
 	Elements         []ElementData
@@ -63,7 +64,7 @@ templ Editor(d *PageData) {
 	<div class="imagetpl" x-data="imagetpl" data-config={ editorConfigJSON(d) }>
 		<div class="imagetpl-layout">
 			@Preview(d)
-			<form class="imagetpl-fields" method="post" action={ d.URLs.Export } x-on:submit="persist()">
+			<form class="imagetpl-fields" method="post" action={ d.URLs.Export } x-on:submit.prevent="download($event)">
 				<div class="imagetpl-fields-heading">
 					<div>
 						<strong>Image details</strong>
@@ -112,10 +113,10 @@ templ Editor(d *PageData) {
 				}
 			</form>
 		</div>
-		<form class="imagetpl-upload" method="post" enctype="multipart/form-data" action={ d.URLs.Upload }>
+		<form class="imagetpl-upload" method="post" enctype="multipart/form-data" action={ d.URLs.Upload } hx-post={ d.URLs.Upload } hx-encoding="multipart/form-data" hx-swap="none">
 			<div class="imagetpl-upload-copy">
 				<strong>Background image</strong>
-				<span>Use a JPG, PNG, or GIF up to 32 MB.</span>
+				<span>Use a JPG, PNG, or GIF up to 30 MB.</span>
 			</div>
 			<label class="imagetpl-upload-picker">
 				<span>Choose image</span>
@@ -168,7 +169,7 @@ func editorConfigJSON(d *PageData) string {
 	}
 	for _, el := range d.Elements {
 		config.Fields = append(config.Fields, el.Field)
-		config.FieldDefaults[el.Field] = ""
+		config.FieldDefaults[el.Field] = d.FieldDefaults[el.Field]
 		config.StyleDefaults[el.Field] = styleDefault{Font: el.Font, Color: el.Color}
 	}
 	encoded, _ := json.Marshal(config)

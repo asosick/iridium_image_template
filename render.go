@@ -8,6 +8,7 @@ import (
 	_ "image/gif" // register GIF decoder
 	"image/jpeg"
 	_ "image/png" // register PNG decoder
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,6 +38,7 @@ func RenderJPEG(background []byte, elements []TemplateElement, values map[string
 	draw.Draw(canvas, bounds, src, image.Point{}, draw.Src)
 
 	for _, el := range elements {
+		el = resolveGeometry(el, bounds.Dx(), bounds.Dy())
 		text := values[el.Field]
 		if text == "" {
 			continue
@@ -57,6 +59,20 @@ func RenderJPEG(background []byte, elements []TemplateElement, values map[string
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func resolveGeometry(el TemplateElement, width, height int) TemplateElement {
+	if el.RelativePosition {
+		el.X = int(math.Round(el.XRatio * float64(width)))
+		el.Y = int(math.Round(el.YRatio * float64(height)))
+	}
+	if el.RelativeFontSize {
+		el.FontSize = math.Max(1, el.FontSizeRatio*float64(height))
+	}
+	if el.RelativeMaxWidth {
+		el.MaxWidth = int(math.Round(el.MaxWidthRatio * float64(width)))
+	}
+	return el
 }
 
 func drawTextElement(dst draw.Image, el TemplateElement, text string) error {

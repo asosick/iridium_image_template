@@ -60,6 +60,7 @@ func panelFor(mux *http.ServeMux) *panel.Panel {
 		PanelItems(promoPage()).
 		Middleware(
 			middleware.RecoveryMiddleware,
+			middleware.CSRFMiddleware,
 			middleware.MaxRequestBodySize,
 		).
 		PanelMiddleware(

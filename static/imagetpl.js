@@ -96,6 +96,40 @@
             }
         },
 
+        async download(event) {
+            this.persist();
+            const form = event.target;
+            const button = form.querySelector('button[type="submit"]');
+            if (button) button.disabled = true;
+            try {
+                const token = window.Alpine?.store('security')?.csrf || '';
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    credentials: 'same-origin',
+                    headers: { 'X-CSRF-Token': token },
+                });
+                if (!response.ok) throw new Error('The JPEG could not be created.');
+                const data = await response.blob();
+                const disposition = response.headers.get('Content-Disposition') || '';
+                const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'template.jpg';
+                const url = URL.createObjectURL(data);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.append(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (error) {
+                window.dispatchEvent(new CustomEvent('notify', { detail: {
+                    type: 'error', message: 'Download failed', description: error.message,
+                } }));
+            } finally {
+                if (button) button.disabled = false;
+            }
+        },
+
         clearSaved() {
             this.suppressPersistence = true;
             try {

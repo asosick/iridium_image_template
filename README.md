@@ -24,7 +24,7 @@ is only for convenience).
 ## What it does
 
 - **Upload a background image** — JPEG, PNG or GIF — or set a default from a
-  file / bytes.
+  file / bytes. A `BackgroundStore` can persist uploads across restarts.
 - **Edit text fields** with an instant live preview (Alpine `x-model` → `x-text`).
 - **Adjust each layer** with a font selector and colour picker; the selected
   styles are used again when the image is exported.
@@ -84,6 +84,21 @@ Register the page with `PanelItems`. The panel should include request recovery
 and body-size middleware, plus `middleware.Spa` so the editor loads inside the
 Iridium app shell.
 
+For a persistent shared background, configure a store before registering the
+page:
+
+```go
+p := promoPage()
+if err := p.UseBackgroundStore(imagetpl.FileBackgroundStore{Path: "data/banner-background"}); err != nil {
+    return err
+}
+```
+
+Other storage systems can implement `BackgroundStore`. `ValuesFn` supplies
+request-specific initial text keyed by configured field name; use
+`RememberValues(false)` when those values should take precedence over a browser
+draft. The plugin does not persist text choices on the server.
+
 ### Server-side processing (`ExportHook`)
 
 Register a hook to act on the rendered image when the user clicks the publish
@@ -108,11 +123,14 @@ responds with a success/error notification; the download button is unaffected.
 | Method | Description |
 |---|---|
 | `Position(x, y)` | Top-left origin in background pixels. |
+| `PositionRelative(x, y)` | Anchor at fractions of background width and height, from 0 to 1. |
 | `FontSize(pt)` | Point size (== px at the renderer's 72 DPI). |
+| `FontSizeRelative(fraction)` | Font size as a fraction of background height. |
 | `Color("#RRGGBB")` | Text colour (default `#ffffff`). |
 | `Align(...)` | `AlignLeft` / `AlignCenter` / `AlignRight`. |
 | `Font(...)` | Default font: `FontRegular`, `FontBold`, `FontItalic`, `FontBoldItalic`, or `FontMono`. |
 | `MaxWidth(px)` | Word-wrap width; alignment is measured against it. |
+| `MaxWidthRelative(fraction)` | Word-wrap width as a fraction of background width. |
 
 `Text(field, label)` starts a new element (committing the previous one);
 `End()` finishes the last element and returns the page.
@@ -176,12 +194,12 @@ the shared Alpine `fields` scope with `x-model`.
 - **CSP Alpine.** Iridium ships the CSP build of Alpine, so `x-data` must
   reference a registered component name — never an inline object. This plugin
   registers `Alpine.data("imagetpl", ...)` in `static/imagetpl.js`.
-- **Background storage is in-memory.** The uploaded background lives on the page
-  struct for the process lifetime; it is shared by all users of that page and is
-  not durable across restarts. For durable storage, persist accepted bytes at
-  the upload boundary and load them through `BackgroundBytes` during page
-  construction. Uploads are limited to 32 MiB and 40 megapixels and are decoded
-  before replacing the current background.
+- **Background storage.** Without a `BackgroundStore`, the uploaded background
+  is shared by users of the page for the process lifetime. `FileBackgroundStore`
+  saves the original bytes atomically and reloads them on startup. Uploads are
+  limited to 30 MiB and 40 megapixels and are decoded before replacing the
+  current background. Iridium's default 32 MiB request limit leaves room for
+  the multipart envelope.
 - **Draft storage is browser-local.** Remembered values are deliberately kept in
   `localStorage` so a user can return to the same page without introducing a
   server-side draft store. Do not put secrets or sensitive material in template
@@ -197,6 +215,7 @@ doc.go        package docs + usage
 element.go    TemplateElement type + alignment constants
 page.go       ImageTemplatePage builder, GetComponent, RegisterRoutes
 export.go     ExportResult / ExportHook + Filename / ExportHook / PublishLabel
+storage.go    BackgroundStore / FileBackgroundStore
 render.go     JPEG compositing + text drawing (font/wrap/align/colour)
 routes.go     upload / background / export / publish handlers
 embed.go      CSS + JS asset registration

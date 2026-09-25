@@ -1,6 +1,7 @@
 package imagetpl
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"strconv"
@@ -29,15 +30,17 @@ import (
 type ImageTemplatePage struct {
 	*panel.CustomPanelPage
 
-	mu         sync.RWMutex
-	background []byte
-	bgWidth    int
-	bgHeight   int
-	bgVersion  int64
+	mu              sync.RWMutex
+	background      []byte
+	backgroundStore BackgroundStore
+	bgWidth         int
+	bgHeight        int
+	bgVersion       int64
 
 	elements []TemplateElement
 	fonts    []FontOption
 	remember bool
+	valuesFn func(*http.Request) map[string]string
 
 	exportHook   ExportHook
 	filename     string
@@ -84,6 +87,15 @@ func (p *ImageTemplatePage) BackgroundBytes(data []byte) *ImageTemplatePage {
 		return p
 	}
 	p.setBackground(data, width, height, false)
+	return p
+}
+
+// ValuesFn supplies initial text for each request. Only configured text fields
+// are used, so callers can safely return a shared map with other values.
+func (p *ImageTemplatePage) ValuesFn(fn func(*http.Request) map[string]string) *ImageTemplatePage {
+	p.mu.Lock()
+	p.valuesFn = fn
+	p.mu.Unlock()
 	return p
 }
 
@@ -146,12 +158,33 @@ type TextElementBuilder struct {
 func (b *TextElementBuilder) Position(x, y int) *TextElementBuilder {
 	b.elem.X = x
 	b.elem.Y = y
+	b.elem.RelativePosition = false
+	return b
+}
+
+// PositionRelative places the text anchor at fractions of the background size.
+func (b *TextElementBuilder) PositionRelative(x, y float64) *TextElementBuilder {
+	if x >= 0 && x <= 1 && y >= 0 && y <= 1 {
+		b.elem.XRatio = x
+		b.elem.YRatio = y
+		b.elem.RelativePosition = true
+	}
 	return b
 }
 
 // FontSize sets the point size (== px at the renderer's 72 DPI).
 func (b *TextElementBuilder) FontSize(pt float64) *TextElementBuilder {
 	b.elem.FontSize = pt
+	b.elem.RelativeFontSize = false
+	return b
+}
+
+// FontSizeRelative sizes text as a fraction of the background height.
+func (b *TextElementBuilder) FontSizeRelative(fraction float64) *TextElementBuilder {
+	if fraction > 0 && fraction <= 1 {
+		b.elem.FontSizeRatio = fraction
+		b.elem.RelativeFontSize = true
+	}
 	return b
 }
 
@@ -177,6 +210,16 @@ func (b *TextElementBuilder) Align(a string) *TextElementBuilder {
 // MaxWidth enables word wrapping to the given pixel width.
 func (b *TextElementBuilder) MaxWidth(px int) *TextElementBuilder {
 	b.elem.MaxWidth = px
+	b.elem.RelativeMaxWidth = false
+	return b
+}
+
+// MaxWidthRelative wraps text within a fraction of the background width.
+func (b *TextElementBuilder) MaxWidthRelative(fraction float64) *TextElementBuilder {
+	if fraction > 0 && fraction <= 1 {
+		b.elem.MaxWidthRatio = fraction
+		b.elem.RelativeMaxWidth = true
+	}
 	return b
 }
 
@@ -328,6 +371,7 @@ func (p *ImageTemplatePage) buildPageData(r *http.Request) *views.PageData {
 	hasPublish := p.exportHook != nil
 	publishLabel := p.publishLabel
 	remember := p.remember
+	valuesFn := p.valuesFn
 	elements := append([]TemplateElement(nil), p.elements...)
 	fonts := cloneFontOptions(p.fonts)
 	p.mu.RUnlock()
@@ -339,6 +383,7 @@ func (p *ImageTemplatePage) buildPageData(r *http.Request) *views.PageData {
 		HasPublish:       hasPublish,
 		PublishLabel:     publishLabel,
 		RememberValues:   remember,
+		FieldDefaults:    make(map[string]string, len(elements)),
 		PersistenceKey:   persistenceKey(prefix),
 		URLs: views.PageURLs{
 			Upload:  prefix + routeUpload,
@@ -351,6 +396,7 @@ func (p *ImageTemplatePage) buildPageData(r *http.Request) *views.PageData {
 	}
 
 	for _, el := range elements {
+		el = resolveGeometry(el, bgW, bgH)
 		font := submittedFont("", el.Font, fonts)
 		d.Elements = append(d.Elements, views.ElementData{
 			Field:    el.Field,
@@ -363,6 +409,12 @@ func (p *ImageTemplatePage) buildPageData(r *http.Request) *views.PageData {
 			Font:     font,
 			MaxWidth: el.MaxWidth,
 		})
+	}
+	if valuesFn != nil {
+		defaults := valuesFn(r)
+		for _, el := range elements {
+			d.FieldDefaults[el.Field] = limitText(defaults[el.Field])
+		}
 	}
 	for _, font := range fonts {
 		d.Fonts = append(d.Fonts, views.FontData{ID: font.ID, Label: font.Label})
@@ -406,6 +458,21 @@ func (p *ImageTemplatePage) setBackground(data []byte, width, height int, increm
 		p.bgVersion++
 	}
 	p.mu.Unlock()
+}
+
+func (p *ImageTemplatePage) saveBackground(ctx context.Context, data []byte, width, height int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.backgroundStore != nil {
+		if err := p.backgroundStore.Save(ctx, data); err != nil {
+			return err
+		}
+	}
+	p.background = append([]byte(nil), data...)
+	p.bgWidth = width
+	p.bgHeight = height
+	p.bgVersion++
+	return nil
 }
 
 // panelPathFromRequest pulls the panel prefix from the current request's

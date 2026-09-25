@@ -22,6 +22,7 @@ const defaultTextColor = "#ffffff"
 //     It is also the key into the values map passed to RenderJPEG.
 //   - Label is the human-readable label shown above the form input.
 //   - X/Y is the top-left origin of the text box, in background pixels.
+//   - Relative position, font size, and width use fractions of the background.
 //   - FontSize is the point size (== px at 72 DPI).
 //   - Color is a "#RRGGBB" hex colour (default "#ffffff").
 //   - Align is one of AlignLeft / AlignCenter / AlignRight.
@@ -29,13 +30,20 @@ const defaultTextColor = "#ffffff"
 //   - MaxWidth, when > 0, word-wraps the text to that pixel width; the
 //     alignment is then measured against the full MaxWidth box.
 type TemplateElement struct {
-	Field    string
-	Label    string
-	X        int
-	Y        int
-	FontSize float64
-	Color    string
-	Align    string
-	Font     string
-	MaxWidth int
+	Field            string
+	Label            string
+	X                int
+	Y                int
+	XRatio           float64
+	YRatio           float64
+	RelativePosition bool
+	FontSize         float64
+	FontSizeRatio    float64
+	RelativeFontSize bool
+	Color            string
+	Align            string
+	Font             string
+	MaxWidth         int
+	MaxWidthRatio    float64
+	RelativeMaxWidth bool
 }

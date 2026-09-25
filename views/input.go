@@ -35,7 +35,7 @@ func fieldInput(el ElementData) templ.Component {
 	// The concrete input always renders a maxlength; the default is 100, which
 	// is too tight for template copy. Use a generous cap so long promotional
 	// text isn't silently truncated.
-	block.MaxLengthInt = 1000
+	block.MaxLengthInt = 2000
 
 	return fields.NewInput(block).Component()
 }

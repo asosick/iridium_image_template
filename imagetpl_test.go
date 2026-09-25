@@ -6,10 +6,12 @@ import (
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -92,6 +94,108 @@ func TestHandleUploadRejectsInvalidImageWithoutChangingBackground(t *testing.T) 
 	}
 	if !bytes.Equal(page.snapshot().background, original) {
 		t.Fatal("invalid upload changed the existing background")
+	}
+}
+
+func TestUploadedBackgroundSurvivesPageRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "background")
+	store := FileBackgroundStore{Path: path}
+	page := NewImageTemplatePage("Promo", "/promo")
+	if err := page.UseBackgroundStore(store); err != nil {
+		t.Fatalf("configure store: %v", err)
+	}
+	background := encodedImage(t, "png", 40, 24, color.RGBA{R: 80, G: 90, B: 100, A: 255})
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("background", "background.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(background); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/promo/upload", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	page.handleUpload(response, request)
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("upload status = %d: %s", response.Code, response.Body.String())
+	}
+
+	restarted := NewImageTemplatePage("Promo", "/promo")
+	if err := restarted.UseBackgroundStore(store); err != nil {
+		t.Fatalf("restore background: %v", err)
+	}
+	if !bytes.Equal(restarted.snapshot().background, background) {
+		t.Fatal("restart did not restore the accepted image")
+	}
+	backgroundResponse := httptest.NewRecorder()
+	restarted.handleBackground(backgroundResponse, httptest.NewRequest(http.MethodGet, "/promo/background", nil))
+	if !bytes.Equal(backgroundResponse.Body.Bytes(), background) {
+		t.Fatal("restored background endpoint did not serve the original bytes")
+	}
+}
+
+func TestRequestValuesAreLimitedToConfiguredFields(t *testing.T) {
+	page := NewImageTemplatePage("Promo", "/promo").
+		ValuesFn(func(r *http.Request) map[string]string {
+			return map[string]string{"message": r.URL.Query().Get("message"), "ignored": "private"}
+		}).
+		Text("message", "Message").End()
+	request := httptest.NewRequest(http.MethodGet, "/promo?message=Unavailable", nil)
+	data := page.buildPageData(request)
+	if data.FieldDefaults["message"] != "Unavailable" {
+		t.Fatalf("default message = %q", data.FieldDefaults["message"])
+	}
+	if _, exists := data.FieldDefaults["ignored"]; exists {
+		t.Fatal("unconfigured field was exposed to the editor")
+	}
+}
+
+func TestRelativeTextGeometryTracksBackgroundDimensions(t *testing.T) {
+	page := NewImageTemplatePage("Promo", "/promo").
+		Text("message", "Message").
+		PositionRelative(0.5, 0.4).
+		FontSizeRelative(0.06).
+		MaxWidthRelative(0.8).
+		End()
+	element := page.snapshot().elements[0]
+	first := resolveGeometry(element, 1920, 1080)
+	second := resolveGeometry(element, 1280, 720)
+	if first.X != 960 || first.Y != 432 || first.MaxWidth != 1536 || math.Abs(first.FontSize-64.8) > 0.001 {
+		t.Fatalf("full HD geometry = %+v", first)
+	}
+	if second.X != 640 || second.Y != 288 || second.MaxWidth != 1024 || math.Abs(second.FontSize-43.2) > 0.001 {
+		t.Fatalf("HD geometry = %+v", second)
+	}
+}
+
+func TestPublishPassesRenderedJPEGAndSubmittedValuesToHook(t *testing.T) {
+	background := encodedImage(t, "png", 180, 80, color.RGBA{R: 30, G: 50, B: 70, A: 255})
+	called := false
+	page := NewImageTemplatePage("Promo", "/promo").
+		BackgroundBytes(background).
+		Text("message", "Message").Position(90, 12).Align(AlignCenter).End().
+		ExportHook(func(_ *http.Request, result ExportResult) error {
+			called = true
+			if result.Values["message"] != "Unavailable" || result.Width != 180 || result.Height != 80 {
+				t.Errorf("hook result = %+v", result)
+			}
+			if _, err := jpeg.Decode(bytes.NewReader(result.Data)); err != nil {
+				t.Errorf("hook did not receive a JPEG: %v", err)
+			}
+			return nil
+		})
+	form := url.Values{"message": {"Unavailable"}}
+	request := httptest.NewRequest(http.MethodPost, "/promo/publish", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response := httptest.NewRecorder()
+	page.handlePublish(response, request)
+	if !called || response.Code != http.StatusNoContent {
+		t.Fatalf("publish called = %v, status = %d, body = %q", called, response.Code, response.Body.String())
 	}
 }
 

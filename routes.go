@@ -25,7 +25,7 @@ const (
 	routeExport     = "/export"
 	routePublish    = "/publish"
 
-	maxUploadBytes        = 32 << 20
+	maxUploadBytes        = 30 << 20
 	maxMultipartBodyBytes = maxUploadBytes + 1<<20
 	maxUploadMemory       = 2 << 20
 )
@@ -85,7 +85,11 @@ func (p *ImageTemplatePage) handleUpload(w http.ResponseWriter, r *http.Request)
 		p.uploadError(w, r, http.StatusBadRequest, "Use a valid JPEG, PNG, or GIF image with reasonable dimensions.")
 		return
 	}
-	p.setBackground(data, width, height, true)
+	if err := p.saveBackground(r.Context(), data, width, height); err != nil {
+		logger.Error("[imagetpl] saving background failed: %v", err)
+		p.uploadError(w, r, http.StatusInternalServerError, "The background could not be saved.")
+		return
+	}
 	p.redirectToPage(w, r)
 }
 
@@ -145,7 +149,7 @@ func (p *ImageTemplatePage) handleBackground(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Content-Type", http.DetectContentType(background))
 	w.Header().Set("Content-Disposition", "inline")
-	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	w.Header().Set("Cache-Control", "private, no-store")
 	if r.Method == http.MethodHead {
 		w.Header().Set("Content-Length", strconv.Itoa(len(background)))
 		return

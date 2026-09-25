@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/a-h/templ v0.3.1020
-	github.com/iridiumgo/iridium v0.0.0-20260915210324-323609f79c42
+	github.com/iridiumgo/iridium v0.1.0-alpha.3
 	golang.org/x/image v0.46.0
 )
 
