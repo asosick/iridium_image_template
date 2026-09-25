@@ -199,6 +199,34 @@ func TestPublishPassesRenderedJPEGAndSubmittedValuesToHook(t *testing.T) {
 	}
 }
 
+func TestPublishAcceptsMultipartEditorValues(t *testing.T) {
+	background := encodedImage(t, "png", 180, 80, color.RGBA{R: 30, G: 50, B: 70, A: 255})
+	var published string
+	page := NewImageTemplatePage("Promo", "/promo").
+		BackgroundBytes(background).
+		Text("message", "Message").Position(90, 12).Align(AlignCenter).End().
+		ExportHook(func(_ *http.Request, result ExportResult) error {
+			published = result.Values["message"]
+			return nil
+		})
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("message", "Unavailable"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/promo/publish", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	page.handlePublish(response, request)
+	if response.Code != http.StatusNoContent || published != "Unavailable" {
+		t.Fatalf("publish status = %d, message = %q", response.Code, published)
+	}
+}
+
 func TestResolveSubmissionBoundsEditableValues(t *testing.T) {
 	page := NewImageTemplatePage("Promo", "/promo").
 		FontOptions(FontOption{ID: FontRegular, Label: "Regular"}, FontOption{ID: FontBold, Label: "Bold"}).
@@ -270,12 +298,21 @@ func TestHandleExportCompositesMessageAndMultilineDescription(t *testing.T) {
 		Text("message", "Message").Position(200, 32).FontSize(38).Color("#ff0000").Align(AlignCenter).
 		Text("description", "Description").Multiline().Position(200, 126).FontSize(27).Color("#00aaff").Align(AlignCenter).End()
 
-	form := url.Values{
-		"message":     {"Unavailable"},
-		"description": {"First line\nSecond line"},
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for field, value := range map[string]string{
+		"message":     "Unavailable",
+		"description": "First line\nSecond line",
+	} {
+		if err := writer.WriteField(field, value); err != nil {
+			t.Fatalf("write %s: %v", field, err)
+		}
 	}
-	request := httptest.NewRequest(http.MethodPost, "/promo/export", strings.NewReader(form.Encode()))
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close form: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/promo/export", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
 	response := httptest.NewRecorder()
 	page.handleExport(response, request)
 	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "image/jpeg" {

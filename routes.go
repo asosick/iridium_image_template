@@ -28,6 +28,8 @@ const (
 	maxUploadBytes        = 30 << 20
 	maxMultipartBodyBytes = maxUploadBytes + 1<<20
 	maxUploadMemory       = 2 << 20
+	maxEditorBodyBytes    = 1 << 20
+	maxEditorMemory       = 64 << 10
 )
 
 var (
@@ -162,9 +164,11 @@ func (p *ImageTemplatePage) handleExport(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+	if !parseEditorForm(w, r) {
 		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
 	}
 
 	snapshot := p.snapshot()
@@ -193,9 +197,11 @@ func (p *ImageTemplatePage) handlePublish(w http.ResponseWriter, r *http.Request
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+	if !parseEditorForm(w, r) {
 		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
 	}
 
 	snapshot := p.snapshot()
@@ -240,6 +246,36 @@ func (p *ImageTemplatePage) handlePublish(w http.ResponseWriter, r *http.Request
 		"description": "The image was processed successfully.",
 	})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func parseEditorForm(w http.ResponseWriter, r *http.Request) bool {
+	// FormData downloads arrive as multipart; ParseForm alone leaves their fields empty.
+	if r.ContentLength > maxEditorBodyBytes {
+		http.Error(w, "form too large", http.StatusRequestEntityTooLarge)
+		return false
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxEditorBodyBytes)
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err == nil {
+		switch mediaType {
+		case "multipart/form-data":
+			err = r.ParseMultipartForm(maxEditorMemory)
+		case "application/x-www-form-urlencoded":
+			err = r.ParseForm()
+		default:
+			err = errors.New("unsupported form type")
+		}
+	}
+	if err == nil {
+		return true
+	}
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		http.Error(w, "form too large", http.StatusRequestEntityTooLarge)
+	} else {
+		http.Error(w, "bad form", http.StatusBadRequest)
+	}
+	return false
 }
 
 func (p *ImageTemplatePage) resolveSubmission(r *http.Request, snapshot pageSnapshot) ([]TemplateElement, map[string]string) {
