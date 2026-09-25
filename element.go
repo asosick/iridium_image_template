@@ -32,6 +32,7 @@ const defaultTextColor = "#ffffff"
 type TemplateElement struct {
 	Field            string
 	Label            string
+	Multiline        bool
 	X                int
 	Y                int
 	XRatio           float64

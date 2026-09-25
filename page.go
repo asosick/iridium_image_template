@@ -162,6 +162,12 @@ func (b *TextElementBuilder) Position(x, y int) *TextElementBuilder {
 	return b
 }
 
+// Multiline uses a text area for copy that may span several lines.
+func (b *TextElementBuilder) Multiline() *TextElementBuilder {
+	b.elem.Multiline = true
+	return b
+}
+
 // PositionRelative places the text anchor at fractions of the background size.
 func (b *TextElementBuilder) PositionRelative(x, y float64) *TextElementBuilder {
 	if x >= 0 && x <= 1 && y >= 0 && y <= 1 {
@@ -399,15 +405,16 @@ func (p *ImageTemplatePage) buildPageData(r *http.Request) *views.PageData {
 		el = resolveGeometry(el, bgW, bgH)
 		font := submittedFont("", el.Font, fonts)
 		d.Elements = append(d.Elements, views.ElementData{
-			Field:    el.Field,
-			Label:    el.Label,
-			X:        el.X,
-			Y:        el.Y,
-			FontSize: el.FontSize,
-			Color:    el.Color,
-			Align:    el.Align,
-			Font:     font,
-			MaxWidth: el.MaxWidth,
+			Field:     el.Field,
+			Label:     el.Label,
+			Multiline: el.Multiline,
+			X:         el.X,
+			Y:         el.Y,
+			FontSize:  el.FontSize,
+			Color:     el.Color,
+			Align:     el.Align,
+			Font:      font,
+			MaxWidth:  el.MaxWidth,
 		})
 	}
 	if valuesFn != nil {

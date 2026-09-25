@@ -263,6 +263,45 @@ func TestRenderJPEGUsesConfiguredFontAndColour(t *testing.T) {
 	}
 }
 
+func TestHandleExportCompositesMessageAndMultilineDescription(t *testing.T) {
+	background := encodedImage(t, "png", 400, 240, color.RGBA{R: 24, G: 24, B: 24, A: 255})
+	page := NewImageTemplatePage("Promo", "/promo").
+		BackgroundBytes(background).
+		Text("message", "Message").Position(200, 32).FontSize(38).Color("#ff0000").Align(AlignCenter).
+		Text("description", "Description").Multiline().Position(200, 126).FontSize(27).Color("#00aaff").Align(AlignCenter).End()
+
+	form := url.Values{
+		"message":     {"Unavailable"},
+		"description": {"First line\nSecond line"},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/promo/export", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response := httptest.NewRecorder()
+	page.handleExport(response, request)
+	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("export status = %d, type = %q, body = %q", response.Code, response.Header().Get("Content-Type"), response.Body.String())
+	}
+	rendered, err := jpeg.Decode(bytes.NewReader(response.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("decode export: %v", err)
+	}
+	var redMessage, blueDescription int
+	for y := 0; y < 240; y++ {
+		for x := 0; x < 400; x++ {
+			r, g, b, _ := rendered.At(x, y).RGBA()
+			if y < 110 && r > 0xb000 && g < 0x6000 && b < 0x6000 {
+				redMessage++
+			}
+			if y >= 126 && b > 0xa000 && r < 0x6000 && g > 0x5000 {
+				blueDescription++
+			}
+		}
+	}
+	if redMessage == 0 || blueDescription == 0 {
+		t.Fatalf("export text pixels: message=%d, description=%d", redMessage, blueDescription)
+	}
+}
+
 func TestSafeDownloadFilenamePreventsHeaderInjection(t *testing.T) {
 	tests := map[string]string{
 		"../../promo":            "promo.jpg",

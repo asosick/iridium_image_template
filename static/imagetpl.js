@@ -103,9 +103,16 @@
             if (button) button.disabled = true;
             try {
                 const token = window.Alpine?.store('security')?.csrf || '';
+                const body = new FormData(form);
+                (this.config.fields || []).forEach((field) => {
+                    const style = this.styles[field] || {};
+                    body.set(field, limitedText(this.fields[field] || ''));
+                    body.set('_imagetpl_font_' + field, style.font || '');
+                    body.set('_imagetpl_color_' + field, style.color || '');
+                });
                 const response = await fetch(form.action, {
                     method: 'POST',
-                    body: new FormData(form),
+                    body,
                     credentials: 'same-origin',
                     headers: { 'X-CSRF-Token': token },
                 });

@@ -27,6 +27,15 @@ func fieldInput(el ElementData) templ.Component {
 		"x-model":      fieldExpr(el.Field),
 		"autocomplete": "off",
 	}
+	if el.Multiline {
+		block := &textAreaBlock{
+			BaseFieldConcrete: base,
+			TextAreaBlock:     bfield.NewTextAreaBlock(),
+		}
+		block.MaxLengthInt = 2000
+		block.RowsInt = 3
+		return fields.NewTextArea(block).Component()
+	}
 
 	block := &inputBlock{
 		BaseFieldConcrete: base,
@@ -38,6 +47,11 @@ func fieldInput(el ElementData) templ.Component {
 	block.MaxLengthInt = 2000
 
 	return fields.NewInput(block).Component()
+}
+
+type textAreaBlock struct {
+	*field.BaseFieldConcrete
+	*bfield.TextAreaBlock
 }
 
 type nativeSelectBlock struct {

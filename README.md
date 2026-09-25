@@ -25,7 +25,7 @@ is only for convenience).
 
 - **Upload a background image** — JPEG, PNG or GIF — or set a default from a
   file / bytes. A `BackgroundStore` can persist uploads across restarts.
-- **Edit text fields** with an instant live preview (Alpine `x-model` → `x-text`).
+- **Edit text fields**, including optional multiline copy, with an instant live preview (Alpine `x-model` → `x-text`).
 - **Adjust each layer** with a font selector and colour picker; the selected
   styles are used again when the image is exported.
 - **Restore the last draft** automatically in the same browser, including text,
@@ -71,6 +71,7 @@ func promoPage() *imagetpl.ImageTemplatePage {
             Align(imagetpl.AlignCenter).
             MaxWidth(980).
         Text("promo_text", "Promotional Message").
+            Multiline().
             Position(600, 345).
             FontSize(30).
             Color("#ffffff").
