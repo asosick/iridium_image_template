@@ -299,7 +299,7 @@ func Editor(d *PageData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\" hx-encoding=\"multipart/form-data\" hx-swap=\"none\"><div class=\"imagetpl-upload-copy\"><strong>Background image</strong> <span>Use a JPG, PNG, or GIF up to 30 MB.</span></div><label class=\"imagetpl-upload-picker\"><span>Choose image</span> <input type=\"file\" name=\"background\" accept=\"image/jpeg,image/png,image/gif\" data-imagetpl-upload-input></label> <button type=\"submit\" class=\"ir-btn-outline\">Upload background</button></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\" hx-encoding=\"multipart/form-data\" hx-trigger=\"change\" hx-swap=\"none\"><div class=\"imagetpl-upload-copy\"><strong>Background image</strong> <span>Use a JPG, PNG, or GIF up to 30 MB.</span></div><input type=\"file\" name=\"background\" accept=\"image/jpeg,image/png,image/gif\" class=\"imagetpl-upload-input\" tabindex=\"-1\" aria-hidden=\"true\" x-ref=\"backgroundInput\"> <button type=\"button\" class=\"ir-btn-outline\" x-on:click=\"$refs.backgroundInput.click()\">Upload</button></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -340,7 +340,7 @@ func Preview(d *PageData) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(d.BackgroundWidth) + " × " + strconv.Itoa(d.BackgroundHeight))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 136, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 141, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -363,7 +363,7 @@ func Preview(d *PageData) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(d.BackgroundURL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 142, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 147, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 			if templ_7745c5c3_Err != nil {
@@ -399,7 +399,7 @@ func Preview(d *PageData) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(elStyle(el, d.BackgroundWidth, d.BackgroundHeight))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 146, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 151, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -412,7 +412,7 @@ func Preview(d *PageData) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(fieldExpr(el.Field))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 147, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 152, Col: 34}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 				if templ_7745c5c3_Err != nil {
@@ -425,7 +425,7 @@ func Preview(d *PageData) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(previewStyleExpr(el.Field))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 148, Col: 47}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/page.templ`, Line: 153, Col: 47}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 				if templ_7745c5c3_Err != nil {

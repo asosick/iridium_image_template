@@ -199,7 +199,7 @@
 .imagetpl-upload {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: end;
+	align-items: center;
 	gap: 0.8rem 1rem;
 	padding: 1rem;
 	border: 1px solid var(--ir-border, rgba(128, 128, 128, 0.2));
@@ -220,18 +220,8 @@
 	color: var(--ir-muted, #737373);
 }
 
-.imagetpl-upload-picker {
-	display: flex;
-	min-width: min(100%, 15rem);
-	flex: 1 1 15rem;
-	flex-direction: column;
-	gap: 0.35rem;
-	font-size: 0.8rem;
-}
-
-.imagetpl-upload-picker input[type='file'] {
-	max-width: 100%;
-	font-size: 0.8rem;
+.imagetpl-upload-input {
+	display: none;
 }
 
 @media (max-width: 900px) {

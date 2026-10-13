@@ -114,16 +114,21 @@ templ Editor(d *PageData) {
 				}
 			</form>
 		</div>
-		<form class="imagetpl-upload" method="post" enctype="multipart/form-data" action={ d.URLs.Upload } hx-post={ d.URLs.Upload } hx-encoding="multipart/form-data" hx-swap="none">
+		<form class="imagetpl-upload" method="post" enctype="multipart/form-data" action={ d.URLs.Upload } hx-post={ d.URLs.Upload } hx-encoding="multipart/form-data" hx-trigger="change" hx-swap="none">
 			<div class="imagetpl-upload-copy">
 				<strong>Background image</strong>
 				<span>Use a JPG, PNG, or GIF up to 30 MB.</span>
 			</div>
-			<label class="imagetpl-upload-picker">
-				<span>Choose image</span>
-				<input type="file" name="background" accept="image/jpeg,image/png,image/gif" data-imagetpl-upload-input/>
-			</label>
-			<button type="submit" class="ir-btn-outline">Upload background</button>
+			<input
+				type="file"
+				name="background"
+				accept="image/jpeg,image/png,image/gif"
+				class="imagetpl-upload-input"
+				tabindex="-1"
+				aria-hidden="true"
+				x-ref="backgroundInput"
+			/>
+			<button type="button" class="ir-btn-outline" x-on:click="$refs.backgroundInput.click()">Upload</button>
 		</form>
 	</div>
 }
