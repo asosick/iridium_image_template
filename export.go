@@ -22,6 +22,37 @@ type ExportResult struct {
 // Returning an error surfaces a failure notification and aborts the publish.
 type ExportHook func(r *http.Request, result ExportResult) error
 
+// ExportGate decides, per request, whether the finished image may leave the
+// page: be downloaded (/export) or handed to the ExportHook (/publish). Return
+// nil to allow it. A returned error's message is shown to the user:
+//
+//   - the editor shows it as a notice, and the Download button reports it
+//     instead of sending a request;
+//   - the server answers 403 with it, so a request sent anyway is refused.
+//
+// The editor, the live preview and the background upload are not affected, so
+// a page can be tried before it is unlocked.
+type ExportGate func(r *http.Request) error
+
+// ExportGate registers the gate for downloading and publishing.
+func (p *ImageTemplatePage) ExportGate(fn ExportGate) *ImageTemplatePage {
+	p.mu.Lock()
+	p.exportGate = fn
+	p.mu.Unlock()
+	return p
+}
+
+// exportDenied returns the gate's refusal for a request, or nil.
+func (p *ImageTemplatePage) exportDenied(r *http.Request) error {
+	p.mu.RLock()
+	gate := p.exportGate
+	p.mu.RUnlock()
+	if gate == nil {
+		return nil
+	}
+	return gate(r)
+}
+
 // Filename sets the download filename for the exported JPEG (used in the
 // Content-Disposition header and passed to the ExportHook). Defaults to
 // "template.jpg".

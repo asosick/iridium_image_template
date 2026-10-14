@@ -164,6 +164,10 @@ func (p *ImageTemplatePage) handleExport(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if err := p.exportDenied(r); err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
 	if !parseEditorForm(w, r) {
 		return
 	}
@@ -195,6 +199,10 @@ func (p *ImageTemplatePage) handleExport(w http.ResponseWriter, r *http.Request)
 func (p *ImageTemplatePage) handlePublish(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := p.exportDenied(r); err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
 	if !parseEditorForm(w, r) {

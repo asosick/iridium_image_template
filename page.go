@@ -43,6 +43,7 @@ type ImageTemplatePage struct {
 	valuesFn func(*http.Request) map[string]string
 
 	exportHook   ExportHook
+	exportGate   ExportGate
 	filename     string
 	publishLabel string
 }
@@ -399,6 +400,9 @@ func (p *ImageTemplatePage) buildPageData(r *http.Request) *views.PageData {
 	}
 	if hasBg {
 		d.BackgroundURL = prefix + routeBackground + "?v=" + strconv.FormatInt(version, 10)
+	}
+	if err := p.exportDenied(r); err != nil {
+		d.ExportLocked = err.Error()
 	}
 
 	for _, el := range elements {

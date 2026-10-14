@@ -2,6 +2,7 @@ package imagetpl
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -170,6 +171,57 @@ func TestRelativeTextGeometryTracksBackgroundDimensions(t *testing.T) {
 	}
 	if second.X != 640 || second.Y != 288 || second.MaxWidth != 1024 || math.Abs(second.FontSize-43.2) > 0.001 {
 		t.Fatalf("HD geometry = %+v", second)
+	}
+}
+
+// An ExportGate that refuses stops the download and the publish hook with the
+// gate's message, and the editor is told why. The gate is asked per request.
+func TestExportGateRefusesDownloadAndPublish(t *testing.T) {
+	background := encodedImage(t, "png", 180, 80, color.RGBA{R: 30, G: 50, B: 70, A: 255})
+	allow := false
+	published := false
+	page := NewImageTemplatePage("Promo", "/promo").
+		BackgroundBytes(background).
+		Text("message", "Message").Position(90, 12).Align(AlignCenter).End().
+		ExportHook(func(*http.Request, ExportResult) error { published = true; return nil }).
+		ExportGate(func(*http.Request) error {
+			if allow {
+				return nil
+			}
+			return errors.New("Not available on this site.")
+		})
+	post := func(handler func(http.ResponseWriter, *http.Request)) *httptest.ResponseRecorder {
+		form := url.Values{"message": {"Unavailable"}}
+		request := httptest.NewRequest(http.MethodPost, "/promo/export", strings.NewReader(form.Encode()))
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		response := httptest.NewRecorder()
+		handler(response, request)
+		return response
+	}
+
+	for name, handler := range map[string]func(http.ResponseWriter, *http.Request){
+		"export": page.handleExport, "publish": page.handlePublish,
+	} {
+		response := post(handler)
+		if response.Code != http.StatusForbidden || !strings.Contains(response.Body.String(), "Not available on this site.") {
+			t.Errorf("%s status = %d, body = %q, want 403 with the gate's message", name, response.Code, response.Body.String())
+		}
+	}
+	if published {
+		t.Error("the export hook ran for a refused request")
+	}
+
+	data := page.buildPageData(httptest.NewRequest(http.MethodGet, "/promo", nil))
+	if data.ExportLocked != "Not available on this site." {
+		t.Errorf("editor ExportLocked = %q, want the gate's message", data.ExportLocked)
+	}
+
+	allow = true
+	if response := post(page.handleExport); response.Code != http.StatusOK {
+		t.Errorf("allowed export status = %d, body = %q", response.Code, response.Body.String())
+	}
+	if page.buildPageData(httptest.NewRequest(http.MethodGet, "/promo", nil)).ExportLocked != "" {
+		t.Error("editor still locked after the gate allowed the export")
 	}
 }
 

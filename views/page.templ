@@ -21,6 +21,9 @@ type PageData struct {
 	Fonts            []FontData
 	Elements         []ElementData
 	URLs             PageURLs
+	// ExportLocked is why the image can't be downloaded or published, from the
+	// page's ExportGate. Empty when it can.
+	ExportLocked string
 }
 
 type PageURLs struct {
@@ -59,6 +62,7 @@ type editorConfig struct {
 	FieldDefaults map[string]string       `json:"fieldDefaults"`
 	StyleDefaults map[string]styleDefault `json:"styleDefaults"`
 	Fonts         []FontData              `json:"fonts"`
+	ExportLocked  string                  `json:"exportLocked,omitempty"`
 }
 
 templ Editor(d *PageData) {
@@ -97,6 +101,9 @@ templ Editor(d *PageData) {
 					</div>
 				}
 				if len(d.Elements) > 0 {
+					if d.ExportLocked != "" {
+						<p class="imagetpl-locked" role="status">{ d.ExportLocked }</p>
+					}
 					<div class="imagetpl-actions">
 						<button type="submit" class="ir-btn-primary">Download JPEG</button>
 						if d.HasPublish {
@@ -172,6 +179,7 @@ func editorConfigJSON(d *PageData) string {
 		FieldDefaults: make(map[string]string, len(d.Elements)),
 		StyleDefaults: make(map[string]styleDefault, len(d.Elements)),
 		Fonts:         append([]FontData(nil), d.Fonts...),
+		ExportLocked:  d.ExportLocked,
 	}
 	for _, el := range d.Elements {
 		config.Fields = append(config.Fields, el.Field)

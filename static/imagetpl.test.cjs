@@ -58,3 +58,48 @@ test('JPEG download submits the current editor text and styles', async () => {
     assert.equal(button.disabled, false);
     assert.equal(clicked, true);
 });
+
+test('a locked page reports why instead of downloading', async () => {
+    let factory;
+    let fetched = false;
+    const notices = [];
+    const context = {
+        window: {
+            Alpine: { data: (_name, value) => { factory = value; }, store: () => ({ csrf: '' }) },
+            dispatchEvent: (event) => notices.push(event.detail),
+        },
+        CustomEvent: class { constructor(_type, init) { this.detail = init.detail; } },
+        fetch: async () => { fetched = true; },
+    };
+    vm.runInNewContext(readFileSync(join(__dirname, 'imagetpl.js'), 'utf8'), context);
+
+    const editor = factory();
+    editor.config = { fields: [], remember: false, exportLocked: 'Needs a licence.' };
+    await editor.download({ target: { querySelector: () => ({}) } });
+
+    assert.equal(fetched, false);
+    assert.equal(notices.length, 1);
+    assert.equal(notices[0].description, 'Needs a licence.');
+});
+
+test('a refused download shows the server message', async () => {
+    let factory;
+    const notices = [];
+    const context = {
+        FormData: class { set() {} },
+        window: {
+            Alpine: { data: (_name, value) => { factory = value; }, store: () => ({ csrf: '' }) },
+            dispatchEvent: (event) => notices.push(event.detail),
+        },
+        CustomEvent: class { constructor(_type, init) { this.detail = init.detail; } },
+        fetch: async () => ({ ok: false, status: 403, text: async () => 'Needs a licence.\n' }),
+    };
+    vm.runInNewContext(readFileSync(join(__dirname, 'imagetpl.js'), 'utf8'), context);
+
+    const editor = factory();
+    editor.config = { fields: [], remember: false };
+    await editor.download({ target: { action: '/x', querySelector: () => ({}) } });
+
+    assert.equal(notices.length, 1);
+    assert.equal(notices[0].description, 'Needs a licence.');
+});

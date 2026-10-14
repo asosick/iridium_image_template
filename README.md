@@ -119,6 +119,25 @@ p.ExportHook(func(r *http.Request, result imagetpl.ExportResult) error {
 `PublishLabel`, default "Publish"). The hook runs server-side on `/publish` and
 responds with a success/error notification; the download button is unaffected.
 
+### Gating the download (`ExportGate`)
+
+Let a page be tried without letting the finished image leave it, for example
+until a feature is licensed:
+
+```go
+p.ExportGate(func(r *http.Request) error {
+    if !licensed() {
+        return errors.New("Trouble Slide is a licensed feature. Contact support to add it.")
+    }
+    return nil
+})
+```
+
+The gate runs for every request that would hand out the image. When it returns
+an error, the editor shows its message as a notice and the Download button
+reports it instead of sending a request; `/export` and `/publish` answer 403
+with the message. The editor, live preview and background upload keep working.
+
 ### Text element options
 
 | Method | Description |
@@ -150,6 +169,7 @@ ImageTemplatePage (panel.CustomPanelPage)
 ├── elements   []TemplateElement // the dynamic text layers
 ├── fonts      []FontOption      // allowed embedded fonts
 ├── exportHook ExportHook        // optional server-side processing
+├── exportGate ExportGate        // optional per-request download/publish gate
 │
 ├── GET  /<page>            → views.Editor    (form + live preview)
 ├── POST /<page>/upload     → store background (multipart "background")
@@ -215,7 +235,7 @@ the shared Alpine `fields` scope with `x-model`.
 doc.go        package docs + usage
 element.go    TemplateElement type + alignment constants
 page.go       ImageTemplatePage builder, GetComponent, RegisterRoutes
-export.go     ExportResult / ExportHook + Filename / ExportHook / PublishLabel
+export.go     ExportResult / ExportHook / ExportGate + Filename / ExportHook / ExportGate / PublishLabel
 storage.go    BackgroundStore / FileBackgroundStore
 render.go     JPEG compositing + text drawing (font/wrap/align/colour)
 routes.go     upload / background / export / publish handlers

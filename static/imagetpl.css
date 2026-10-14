@@ -178,6 +178,16 @@
 	color: var(--ir-muted, #737373);
 }
 
+.imagetpl-locked {
+	margin: 0;
+	padding: 0.55rem 0.7rem;
+	border: 1px solid var(--ir-border, #d4d4d4);
+	border-radius: 0.5rem;
+	font-size: 0.82rem;
+	line-height: 1.4;
+	color: var(--ir-muted, #737373);
+}
+
 .imagetpl-actions {
 	display: flex;
 	flex-wrap: wrap;

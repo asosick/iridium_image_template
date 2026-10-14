@@ -98,6 +98,13 @@
 
         async download(event) {
             this.persist();
+            // The page's ExportGate refused the image: say why, send nothing.
+            if (this.config.exportLocked) {
+                window.dispatchEvent(new CustomEvent('notify', { detail: {
+                    type: 'warning', message: 'Download unavailable', description: this.config.exportLocked,
+                } }));
+                return;
+            }
             const form = event.target;
             const button = form.querySelector('button[type="submit"]');
             if (button) button.disabled = true;
@@ -116,7 +123,11 @@
                     credentials: 'same-origin',
                     headers: { 'X-CSRF-Token': token },
                 });
-                if (!response.ok) throw new Error('The JPEG could not be created.');
+                if (!response.ok) {
+                    // A gate's refusal (403) carries its reason as the body.
+                    const reason = response.status === 403 ? (await response.text()).trim() : '';
+                    throw new Error(reason || 'The JPEG could not be created.');
+                }
                 const data = await response.blob();
                 const disposition = response.headers.get('Content-Disposition') || '';
                 const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'template.jpg';
